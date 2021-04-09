@@ -5,8 +5,8 @@ import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
-import androidx.biometric.BiometricPrompt.CryptoObject
 import androidx.core.content.ContextCompat
+import javax.crypto.Cipher
 
 object BiometricPromptUtil {
     private const val TAG = "BiometricPromptUtil"
@@ -24,12 +24,12 @@ object BiometricPromptUtil {
      * 初始化 BiometricPrompt
      *
      * @param activity
-     * @param listener
+     * @param successListener
      * @return BiometricPrompt
      */
     private fun initBiometricPrompt(
         activity: AppCompatActivity,
-        listener: BiometricAuthListener
+        successListener: (BiometricPrompt.AuthenticationResult) -> Unit
     ): BiometricPrompt {
         val executor = ContextCompat.getMainExecutor(activity)
 
@@ -37,19 +37,16 @@ object BiometricPromptUtil {
             override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                 super.onAuthenticationError(errorCode, errString)
                 Log.d(TAG, "errCode is $errorCode and errString is: $errString")
-                listener.onBiometricAuthenticationError(errorCode, errString.toString())
             }
 
             override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                 super.onAuthenticationSucceeded(result)
-                Log.d(TAG, "Authentication was successful")
-                listener.onBiometricAuthenticationSuccess(result)
+                successListener(result)
             }
 
             override fun onAuthenticationFailed() {
                 super.onAuthenticationFailed()
                 Log.d(TAG, "User biometric rejected.")
-                listener.onBiometricAuthenticationFail()
             }
         }
 
@@ -60,18 +57,19 @@ object BiometricPromptUtil {
      * 顯示BiometricPrompt Dialog
      *
      * @param activity
-     * @param listener
+     * @param successListener
      */
     fun showBiometricPrompt(
         activity: AppCompatActivity,
-        listener: BiometricAuthListener,
-        cryptoObject: CryptoObject? = null
+        successListener: (BiometricPrompt.AuthenticationResult) -> Unit,
+        cryptoObject: Cipher? = null
     ) {
         val promptInfo = setBiometricPromptInfo()
-        val biometricPrompt = initBiometricPrompt(activity, listener)
+        val biometricPrompt = initBiometricPrompt(activity, successListener)
 
         biometricPrompt.apply {
-            authenticate(promptInfo)
+            if (cryptoObject == null) authenticate(promptInfo)
+            else authenticate(promptInfo, BiometricPrompt.CryptoObject(cryptoObject))
         }
     }
 
@@ -90,29 +88,4 @@ object BiometricPromptUtil {
 
         return builder.build()
     }
-}
-
-interface BiometricAuthListener {
-    /**
-     * 辨識成功
-     *
-     * @param result
-     */
-    fun onBiometricAuthenticationSuccess(result: BiometricPrompt.AuthenticationResult)
-
-    /**
-     * 辨識異常
-     *
-     * EX: 取消辨識
-     *
-     * @param errorCode
-     * @param errorMessage
-     */
-    fun onBiometricAuthenticationError(errorCode: Int, errorMessage: String)
-
-    /**
-     * 辨識失敗
-     *
-     */
-    fun onBiometricAuthenticationFail()
 }
